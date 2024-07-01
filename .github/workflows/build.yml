@@ -115,7 +115,7 @@ jobs:
 
     - name: "Build AppImage"
       run: |
-        export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+        export LD_LIBRARY_PATH="/opt/homebrew/lib:$LD_LIBRARY_PATH"
         export DEPLOY_GTK_VERSION=3
         dist/linux/appimage.sh
 
@@ -205,7 +205,7 @@ jobs:
         path: ./bin/Cemu.exe
 
   build-macos:
-    runs-on: macos-12
+    runs-on: macos-14
     steps:
     - name: "Checkout repo"
       uses: actions/checkout@v4
@@ -271,8 +271,8 @@ jobs:
         cmake .. ${{ env.BUILD_FLAGS }} \
         -DCMAKE_BUILD_TYPE=${{ env.BUILD_MODE }} \
         -DMACOS_BUNDLE=ON \
-        -DCMAKE_C_COMPILER=/usr/local/opt/llvm@15/bin/clang \
-        -DCMAKE_CXX_COMPILER=/usr/local/opt/llvm@15/bin/clang++ \
+        -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang \
+        -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang++ \
         -G Ninja
         
     - name: "Build Cemu"
