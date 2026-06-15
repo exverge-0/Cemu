@@ -360,19 +360,6 @@ inline void _mm_pause()
     asm volatile("yield");
 }
 
-inline uint64 __rdtsc()
-{
-    uint64 t;
-    asm volatile("mrs %0, cntvct_el0" : "=r" (t));
-    return t;
-}
-
-inline void _mm_mfence()
-{
-	asm volatile("" ::: "memory");
-	std::atomic_thread_fence(std::memory_order_seq_cst);
-}
-
 inline unsigned char _addcarry_u64(unsigned char carry, unsigned long long a, unsigned long long b, unsigned long long *result)
 {
     *result = a + b + (unsigned long long)carry;
@@ -381,7 +368,32 @@ inline unsigned char _addcarry_u64(unsigned char carry, unsigned long long a, un
     return 0;
 }
 
+inline uint64 _cntfrq()
+{
+	uint64 t;
+	asm volatile("mrs %0, cntfrq_el0" : "=r" (t));
+	return t;
+}
+
 #endif
+
+inline uint64 tick()
+{
+#if defined(ARCH_X86_64)
+	_mm_mfence()
+	return __rdtsc();
+#elif defined(__aarch64__)
+	uint64 t;
+	asm volatile(
+		"isb\n"
+		"mrs %0, cntvct_el0" : "=r" (t)
+	);
+	return t;
+#else
+    #warning Unknown architecture
+	return std::chrono::steady_clock::now();
+#endif
+}
 
 // asserts
 

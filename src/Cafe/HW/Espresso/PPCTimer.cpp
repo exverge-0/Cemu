@@ -4,11 +4,6 @@
 #include "util/highresolutiontimer/HighResolutionTimer.h"
 #include "Common/cpu_features.h"
 
-#if defined(ARCH_X86_64)
-#include <immintrin.h>
-#pragma intrinsic(__rdtsc)
-#endif
-
 uint64 _rdtscLastMeasure = 0;
 uint64 _rdtscFrequency = 0;
 
@@ -31,15 +26,13 @@ uint64 muldiv64(uint64 a, uint64 b, uint64 d)
 	return diva * b + moda * divb + moda * modb / d;
 }
 
+#if defined(ARCH_X86_64)
 uint64 PPCTimer_estimateRDTSCFrequency()
 {
-    #if defined(ARCH_X86_64)
 	if (!g_CPUFeatures.x86.invariant_tsc)
 		cemuLog_log(LogType::Force, "Invariant TSC not supported");
-    #endif
 
-	_mm_mfence();
-	uint64 tscStart = __rdtsc();
+	uint64 tscStart = tick();
 	unsigned int startTime = GetTickCount();
 	HRTick startTick = HighResolutionTimer::now().getTick();
 	// wait roughly 3 seconds
@@ -49,9 +42,8 @@ uint64 PPCTimer_estimateRDTSCFrequency()
 			break;
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
-	_mm_mfence();
+	uint64 tscEnd = tick();
 	HRTick stopTick = HighResolutionTimer::now().getTick();
-	uint64 tscEnd = __rdtsc();
 	// derive frequency approximation from measured time difference
 	uint64 tsc_diff = tscEnd - tscStart;
 	uint64 hrtFreq = 0;
@@ -68,10 +60,15 @@ uint64 PPCTimer_estimateRDTSCFrequency()
 
 	return tsc_freq;
 }
+#endif
 
 int PPCTimer_initThread()
 {
+#if defined(__aarch64__)
+	_rdtscFrequency = _cntfrq();
+#else defined(ARCH_X86_64)
 	_rdtscFrequency = PPCTimer_estimateRDTSCFrequency();
+#endif
 	return 0;
 }
 
@@ -79,20 +76,20 @@ void PPCTimer_init()
 {
 	std::thread t(PPCTimer_initThread);
 	t.detach();
-	_rdtscLastMeasure = __rdtsc();
+	_rdtscLastMeasure = tick();
 }
 
 uint64 _tickSummary = 0;
 
 void PPCTimer_start()
 {
-	_rdtscLastMeasure = __rdtsc();
+	_rdtscLastMeasure = tick();
 	_tickSummary = 0;
 }
 
 uint64 PPCTimer_getRawTsc()
 {
-	return __rdtsc();
+	return tick();
 }
 
 uint64 PPCTimer_microsecondsToTsc(uint64 us)
@@ -127,8 +124,7 @@ FSpinlock sTimerSpinlock;
 uint64 PPCTimer_getFromRDTSC()
 {
 	sTimerSpinlock.lock();
-	_mm_mfence();
-	uint64 rdtscCurrentMeasure = __rdtsc();
+	uint64 rdtscCurrentMeasure = tick();
 	uint64 rdtscDif = rdtscCurrentMeasure - _rdtscLastMeasure;
 	// optimized max(rdtscDif, 0) without conditionals
 	rdtscDif = rdtscDif & ~(uint64)((sint64)rdtscDif >> 63);
